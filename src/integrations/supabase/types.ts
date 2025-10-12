@@ -14,16 +14,194 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      files: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_type: Database["public"]["Enums"]["file_type"]
+          id: string
+          message_hash: string | null
+          original_filename: string
+          stego_file_path: string | null
+          stego_filename: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_type: Database["public"]["Enums"]["file_type"]
+          id?: string
+          message_hash?: string | null
+          original_filename: string
+          stego_file_path?: string | null
+          stego_filename?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_type?: Database["public"]["Enums"]["file_type"]
+          id?: string
+          message_hash?: string | null
+          original_filename?: string
+          stego_file_path?: string | null
+          stego_filename?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "files_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operations: {
+        Row: {
+          created_at: string
+          encryption_algorithm: Database["public"]["Enums"]["encryption_algorithm"]
+          error_message: string | null
+          file_id: string | null
+          id: string
+          operation_type: Database["public"]["Enums"]["operation_type"]
+          status: string
+          stego_algorithm: Database["public"]["Enums"]["stego_algorithm"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encryption_algorithm: Database["public"]["Enums"]["encryption_algorithm"]
+          error_message?: string | null
+          file_id?: string | null
+          id?: string
+          operation_type: Database["public"]["Enums"]["operation_type"]
+          status?: string
+          stego_algorithm: Database["public"]["Enums"]["stego_algorithm"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encryption_algorithm?: Database["public"]["Enums"]["encryption_algorithm"]
+          error_message?: string | null
+          file_id?: string | null
+          id?: string
+          operation_type?: Database["public"]["Enums"]["operation_type"]
+          status?: string
+          stego_algorithm?: Database["public"]["Enums"]["stego_algorithm"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operations_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      encryption_algorithm:
+        | "caesar"
+        | "hill"
+        | "vigenere"
+        | "playfair"
+        | "transposition"
+        | "double_transposition"
+        | "rsa"
+        | "des"
+        | "sdes"
+        | "diffie_hellman"
+        | "elgamal"
+        | "stream_cipher"
+      file_type: "image" | "text"
+      operation_type: "encode" | "decode"
+      stego_algorithm:
+        | "whitespace"
+        | "word_mapping"
+        | "line_shift"
+        | "lsb"
+        | "lsb_matching"
+        | "pvd"
+        | "masking"
+        | "dct_dwt"
+        | "palette_based"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +328,35 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      encryption_algorithm: [
+        "caesar",
+        "hill",
+        "vigenere",
+        "playfair",
+        "transposition",
+        "double_transposition",
+        "rsa",
+        "des",
+        "sdes",
+        "diffie_hellman",
+        "elgamal",
+        "stream_cipher",
+      ],
+      file_type: ["image", "text"],
+      operation_type: ["encode", "decode"],
+      stego_algorithm: [
+        "whitespace",
+        "word_mapping",
+        "line_shift",
+        "lsb",
+        "lsb_matching",
+        "pvd",
+        "masking",
+        "dct_dwt",
+        "palette_based",
+      ],
+    },
   },
 } as const
