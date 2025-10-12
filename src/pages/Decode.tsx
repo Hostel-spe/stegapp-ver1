@@ -1,0 +1,213 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Navbar } from '@/components/Navbar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { decryptMessage, encryptionAlgorithms, type EncryptionAlgorithm } from '@/lib/encryption';
+import { imageAlgorithms, textAlgorithms, type SteganographyAlgorithm } from '@/lib/steganography';
+import { decodeLSB } from '@/lib/steganography/lsb';
+import { decodeWhitespace } from '@/lib/steganography/whitespace';
+import { Upload, Eye } from 'lucide-react';
+
+const Decode = () => {
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [file, setFile] = useState<File | null>(null);
+  const [fileType, setFileType] = useState<'image' | 'text'>('image');
+  const [encryptionKey, setEncryptionKey] = useState('');
+  const [encryptionAlgo, setEncryptionAlgo] = useState<EncryptionAlgorithm>('caesar');
+  const [stegoAlgo, setStegoAlgo] = useState<SteganographyAlgorithm>('lsb');
+  const [loading, setLoading] = useState(false);
+  const [decodedMessage, setDecodedMessage] = useState('');
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/auth');
+    }
+  }, [user, authLoading, navigate]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      const type = selectedFile.type.startsWith('image/') ? 'image' : 'text';
+      setFileType(type);
+    }
+  };
+
+  const handleDecode = async () => {
+    if (!file || !user) return;
+
+    setLoading(true);
+    try {
+      let extractedMessage = '';
+
+      if (fileType === 'image' && stegoAlgo === 'lsb') {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((resolve) => { img.onload = resolve; });
+
+        const canvas = canvasRef.current!;
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        extractedMessage = decodeLSB(imageData);
+      } else if (fileType === 'text' && stegoAlgo === 'whitespace') {
+        const stegoText = await file.text();
+        extractedMessage = decodeWhitespace(stegoText);
+      } else {
+        throw new Error('Algorithm not implemented yet');
+      }
+
+      const decryptedMessage = decryptMessage(extractedMessage, encryptionAlgo, encryptionKey);
+      setDecodedMessage(decryptedMessage);
+
+      await supabase.from('operations').insert({
+        user_id: user.id,
+        operation_type: 'decode',
+        stego_algorithm: stegoAlgo,
+        encryption_algorithm: encryptionAlgo,
+        status: 'success'
+      });
+
+      toast({
+        title: 'Success!',
+        description: 'Message decoded successfully.'
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Decoding failed',
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Decode Message</CardTitle>
+              <CardDescription>
+                Extract hidden message from a stego file
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="file">Upload Stego File</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  accept="image/png,image/bmp,image/jpeg,text/plain"
+                  onChange={handleFileChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Steganography Algorithm Used</Label>
+                <Select value={stegoAlgo} onValueChange={(v) => setStegoAlgo(v as SteganographyAlgorithm)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <optgroup label="Image Algorithms">
+                      {imageAlgorithms.map((algo) => (
+                        <SelectItem key={algo.value} value={algo.value}>
+                          {algo.label}
+                        </SelectItem>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Text Algorithms">
+                      {textAlgorithms.map((algo) => (
+                        <SelectItem key={algo.value} value={algo.value}>
+                          {algo.label}
+                        </SelectItem>
+                      ))}
+                    </optgroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Encryption Algorithm Used</Label>
+                <Select value={encryptionAlgo} onValueChange={(v) => setEncryptionAlgo(v as EncryptionAlgorithm)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {encryptionAlgorithms.map((algo) => (
+                      <SelectItem key={algo.value} value={algo.value}>
+                        {algo.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {['vigenere', 'playfair'].includes(encryptionAlgo) && (
+                <div className="space-y-2">
+                  <Label htmlFor="key">Decryption Key</Label>
+                  <Input
+                    id="key"
+                    type="text"
+                    placeholder="Enter decryption key"
+                    value={encryptionKey}
+                    onChange={(e) => setEncryptionKey(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <Button
+                onClick={handleDecode}
+                disabled={!file || loading}
+                className="w-full"
+              >
+                {loading ? 'Decoding...' : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Decode Message
+                  </>
+                )}
+              </Button>
+
+              {decodedMessage && (
+                <Card className="bg-muted">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Decoded Message</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-wrap break-words">{decodedMessage}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+    </div>
+  );
+};
+
+export default Decode;
