@@ -14,7 +14,8 @@ import { encryptMessage, encryptionAlgorithms, type EncryptionAlgorithm } from '
 import { imageAlgorithms, textAlgorithms, type SteganographyAlgorithm } from '@/lib/steganography';
 import { encodeLSB } from '@/lib/steganography/lsb';
 import { encodeWhitespace } from '@/lib/steganography/whitespace';
-import { Upload, Download } from 'lucide-react';
+import { hashPassphrase, embedHashInMessage } from '@/lib/utils/crypto';
+import { Upload, Download, Lock } from 'lucide-react';
 
 const Encode = () => {
   const { user, loading: authLoading } = useAuth();
@@ -25,6 +26,7 @@ const Encode = () => {
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<'image' | 'text'>('image');
   const [message, setMessage] = useState('');
+  const [passphrase, setPassphrase] = useState('');
   const [encryptionKey, setEncryptionKey] = useState('');
   const [encryptionAlgo, setEncryptionAlgo] = useState<EncryptionAlgorithm>('caesar');
   const [stegoAlgo, setStegoAlgo] = useState<SteganographyAlgorithm>('lsb');
@@ -54,9 +56,25 @@ const Encode = () => {
   const handleEncode = async () => {
     if (!file || !message || !user) return;
 
+    if (!passphrase) {
+      toast({
+        variant: 'destructive',
+        title: 'Passphrase Required',
+        description: 'Please enter a passphrase to protect your message.'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
+      // Hash the passphrase
+      const passphraseHash = await hashPassphrase(passphrase);
+      
+      // Encrypt the message
       const encryptedMessage = encryptMessage(message, encryptionAlgo, encryptionKey);
+      
+      // Embed hash with encrypted message
+      const protectedMessage = embedHashInMessage(passphraseHash, encryptedMessage);
       
       let stegoBlob: Blob;
       let stegoFilename = `stego_${file.name}`;
@@ -73,7 +91,7 @@ const Encode = () => {
         ctx.drawImage(img, 0, 0);
         
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const encodedData = await encodeLSB(imageData, encryptedMessage);
+        const encodedData = await encodeLSB(imageData, protectedMessage);
         ctx.putImageData(encodedData, 0, 0);
         
         stegoBlob = await new Promise<Blob>((resolve) => {
@@ -81,7 +99,7 @@ const Encode = () => {
         });
       } else if (fileType === 'text' && stegoAlgo === 'whitespace') {
         const coverText = await file.text();
-        const encodedText = encodeWhitespace(coverText, encryptedMessage);
+        const encodedText = encodeWhitespace(coverText, protectedMessage);
         stegoBlob = new Blob([encodedText], { type: 'text/plain' });
         stegoFilename = `stego_${file.name}`;
       } else {
@@ -115,7 +133,8 @@ const Encode = () => {
           file_type: fileType,
           file_path: originalPath,
           stego_file_path: stegoPath,
-          message_hash: btoa(message.substring(0, 20))
+          message_hash: btoa(message.substring(0, 20)),
+          passphrase_hash: passphraseHash
         })
         .select()
         .single();
@@ -145,6 +164,7 @@ const Encode = () => {
 
       setFile(null);
       setMessage('');
+      setPassphrase('');
       setPreviewUrl('');
     } catch (error: any) {
       toast({
@@ -247,6 +267,24 @@ const Encode = () => {
               )}
 
               <div className="space-y-2">
+                <Label htmlFor="passphrase" className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Passphrase (Required)
+                </Label>
+                <Input
+                  id="passphrase"
+                  type="password"
+                  placeholder="Enter a passphrase to protect your message"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  className="border-primary/50 focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  You will need this passphrase to decode the message later
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="message">Secret Message</Label>
                 <Textarea
                   id="message"
@@ -259,7 +297,7 @@ const Encode = () => {
 
               <Button
                 onClick={handleEncode}
-                disabled={!file || !message || loading}
+                disabled={!file || !message || !passphrase || loading}
                 className="w-full"
               >
                 {loading ? 'Encoding...' : (

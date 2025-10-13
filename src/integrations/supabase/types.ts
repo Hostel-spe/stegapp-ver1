@@ -22,6 +22,7 @@ export type Database = {
           id: string
           message_hash: string | null
           original_filename: string
+          passphrase_hash: string | null
           stego_file_path: string | null
           stego_filename: string | null
           user_id: string
@@ -33,6 +34,7 @@ export type Database = {
           id?: string
           message_hash?: string | null
           original_filename: string
+          passphrase_hash?: string | null
           stego_file_path?: string | null
           stego_filename?: string | null
           user_id: string
@@ -44,6 +46,7 @@ export type Database = {
           id?: string
           message_hash?: string | null
           original_filename?: string
+          passphrase_hash?: string | null
           stego_file_path?: string | null
           stego_filename?: string | null
           user_id?: string

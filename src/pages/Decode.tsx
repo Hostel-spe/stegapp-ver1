@@ -13,7 +13,8 @@ import { decryptMessage, encryptionAlgorithms, type EncryptionAlgorithm } from '
 import { imageAlgorithms, textAlgorithms, type SteganographyAlgorithm } from '@/lib/steganography';
 import { decodeLSB } from '@/lib/steganography/lsb';
 import { decodeWhitespace } from '@/lib/steganography/whitespace';
-import { Upload, Eye } from 'lucide-react';
+import { hashPassphrase, extractHashFromMessage } from '@/lib/utils/crypto';
+import { Upload, Eye, Lock } from 'lucide-react';
 
 const Decode = () => {
   const { user, loading: authLoading } = useAuth();
@@ -23,6 +24,7 @@ const Decode = () => {
 
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<'image' | 'text'>('image');
+  const [passphrase, setPassphrase] = useState('');
   const [encryptionKey, setEncryptionKey] = useState('');
   const [encryptionAlgo, setEncryptionAlgo] = useState<EncryptionAlgorithm>('caesar');
   const [stegoAlgo, setStegoAlgo] = useState<SteganographyAlgorithm>('lsb');
@@ -47,9 +49,18 @@ const Decode = () => {
   const handleDecode = async () => {
     if (!file || !user) return;
 
+    if (!passphrase) {
+      toast({
+        variant: 'destructive',
+        title: 'Passphrase Required',
+        description: 'Please enter the passphrase to decode this message.'
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      let extractedMessage = '';
+      let protectedMessage = '';
 
       if (fileType === 'image' && stegoAlgo === 'lsb') {
         const img = new Image();
@@ -63,15 +74,36 @@ const Decode = () => {
         ctx.drawImage(img, 0, 0);
         
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        extractedMessage = decodeLSB(imageData);
+        protectedMessage = decodeLSB(imageData);
       } else if (fileType === 'text' && stegoAlgo === 'whitespace') {
         const stegoText = await file.text();
-        extractedMessage = decodeWhitespace(stegoText);
+        protectedMessage = decodeWhitespace(stegoText);
       } else {
         throw new Error('Algorithm not implemented yet');
       }
 
-      const decryptedMessage = decryptMessage(extractedMessage, encryptionAlgo, encryptionKey);
+      // Extract hash and encrypted message
+      const extracted = extractHashFromMessage(protectedMessage);
+      
+      if (!extracted) {
+        throw new Error('Invalid file format. This file may not be password protected.');
+      }
+
+      // Verify passphrase
+      const enteredPassphraseHash = await hashPassphrase(passphrase);
+      
+      if (enteredPassphraseHash !== extracted.hash) {
+        toast({
+          variant: 'destructive',
+          title: 'Incorrect Passphrase',
+          description: 'The passphrase you entered is incorrect.'
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Decrypt the message
+      const decryptedMessage = decryptMessage(extracted.message, encryptionAlgo, encryptionKey);
       setDecodedMessage(decryptedMessage);
 
       await supabase.from('operations').insert({
@@ -180,9 +212,27 @@ const Decode = () => {
                 </div>
               )}
 
+              <div className="space-y-2">
+                <Label htmlFor="passphrase" className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Passphrase (Required)
+                </Label>
+                <Input
+                  id="passphrase"
+                  type="password"
+                  placeholder="Enter the passphrase to unlock the message"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                  className="border-primary/50 focus:border-primary"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the same passphrase used during encoding
+                </p>
+              </div>
+
               <Button
                 onClick={handleDecode}
-                disabled={!file || loading}
+                disabled={!file || !passphrase || loading}
                 className="w-full"
               >
                 {loading ? 'Decoding...' : (
