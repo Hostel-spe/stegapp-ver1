@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptMessage, encryptionAlgorithms, type EncryptionAlgorithm } from '@/lib/encryption';
@@ -197,20 +197,22 @@ const Encode = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <optgroup label="Image Algorithms">
+                    <SelectGroup>
+                      <SelectLabel>Image Algorithms</SelectLabel>
                       {imageAlgorithms.map((algo) => (
                         <SelectItem key={algo.value} value={algo.value}>
                           {algo.label}
                         </SelectItem>
                       ))}
-                    </optgroup>
-                    <optgroup label="Text Algorithms">
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel>Text Algorithms</SelectLabel>
                       {textAlgorithms.map((algo) => (
                         <SelectItem key={algo.value} value={algo.value}>
                           {algo.label}
                         </SelectItem>
                       ))}
-                    </optgroup>
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
