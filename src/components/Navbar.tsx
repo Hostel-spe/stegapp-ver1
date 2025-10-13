@@ -13,11 +13,15 @@ export const Navbar = () => {
   };
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="border-b border-primary/20 bg-card/80 backdrop-blur-lg supports-[backdrop-filter]:bg-card/60 shadow-card">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <Shield className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">SteganoApp</span>
+        <Link to="/" className="flex items-center gap-2 group">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-primary to-accent">
+            <Shield className="h-5 w-5 text-white" />
+          </div>
+          <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
+            SteganoApp
+          </span>
         </Link>
         
         {user && (

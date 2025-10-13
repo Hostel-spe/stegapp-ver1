@@ -137,8 +137,8 @@ const Decode = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          <Card>
+        <div className="max-w-2xl mx-auto animate-fade-in">
+          <Card className="shadow-card border-primary/20 bg-card/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle>Decode Message</CardTitle>
               <CardDescription>
