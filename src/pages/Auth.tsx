@@ -9,6 +9,33 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { z } from 'zod';
+
+// Strong validation schemas
+const signUpSchema = z.object({
+  email: z.string()
+    .min(1, 'Email is required')
+    .email('Invalid email format')
+    .max(255, 'Email must be less than 255 characters'),
+  password: z.string()
+    .min(12, 'Password must be at least 12 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(30, 'Username must be less than 30 characters')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
+});
+
+const signInSchema = z.object({
+  email: z.string()
+    .min(1, 'Email is required')
+    .email('Invalid email format'),
+  password: z.string()
+    .min(1, 'Password is required')
+});
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -29,28 +56,60 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { username }
+    try {
+      // Validate inputs
+      const validation = signUpSchema.safeParse({ email, password, username });
+      
+      if (!validation.success) {
+        const firstError = validation.error.errors[0];
+        toast({
+          variant: 'destructive',
+          title: 'Validation Error',
+          description: firstError.message
+        });
+        setLoading(false);
+        return;
       }
-    });
 
-    setLoading(false);
+      const { error } = await supabase.auth.signUp({
+        email: validation.data.email,
+        password: validation.data.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: { username: validation.data.username }
+        }
+      });
 
-    if (error) {
+      if (error) {
+        // Map errors to user-friendly messages to prevent information leakage
+        let errorMessage = 'Unable to create account. Please try again.';
+        if (error.message.toLowerCase().includes('already registered')) {
+          errorMessage = 'This email is already registered. Please sign in instead.';
+        }
+        
+        toast({
+          variant: 'destructive',
+          title: 'Sign up failed',
+          description: errorMessage
+        });
+      } else {
+        toast({
+          title: 'Success!',
+          description: 'Account created successfully. You can now sign in.'
+        });
+        // Clear form
+        setEmail('');
+        setPassword('');
+        setUsername('');
+      }
+    } catch (err) {
       toast({
         variant: 'destructive',
-        title: 'Sign up failed',
-        description: error.message
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.'
       });
-    } else {
-      toast({
-        title: 'Success!',
-        description: 'Account created successfully. You can now sign in.'
-      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,21 +117,44 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    try {
+      // Validate inputs
+      const validation = signInSchema.safeParse({ email, password });
+      
+      if (!validation.success) {
+        const firstError = validation.error.errors[0];
+        toast({
+          variant: 'destructive',
+          title: 'Validation Error',
+          description: firstError.message
+        });
+        setLoading(false);
+        return;
+      }
 
-    setLoading(false);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: validation.data.email,
+        password: validation.data.password
+      });
 
-    if (error) {
+      if (error) {
+        // Generic error message to prevent username enumeration
+        toast({
+          variant: 'destructive',
+          title: 'Sign in failed',
+          description: 'Invalid email or password. Please try again.'
+        });
+      } else {
+        navigate('/dashboard');
+      }
+    } catch (err) {
       toast({
         variant: 'destructive',
-        title: 'Sign in failed',
-        description: error.message
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.'
       });
-    } else {
-      navigate('/dashboard');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -154,8 +236,11 @@ const Auth = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={12}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Must be 12+ characters with uppercase, lowercase, number, and special character
+                  </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? 'Creating account...' : 'Sign Up'}

@@ -133,7 +133,6 @@ const Encode = () => {
           file_type: fileType,
           file_path: originalPath,
           stego_file_path: stegoPath,
-          message_hash: btoa(message.substring(0, 20)),
           passphrase_hash: passphraseHash
         })
         .select()
