@@ -11,11 +11,20 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { encryptMessage, encryptionAlgorithms, type EncryptionAlgorithm } from '@/lib/encryption';
+import { z } from 'zod';
 import { imageAlgorithms, textAlgorithms, type SteganographyAlgorithm } from '@/lib/steganography';
 import { encodeLSB } from '@/lib/steganography/lsb';
 import { encodeWhitespace } from '@/lib/steganography/whitespace';
 import { hashPassphrase, embedHashInMessage } from '@/lib/utils/crypto';
 import { Upload, Download, Lock } from 'lucide-react';
+
+const messageSchema = z.string()
+  .min(1, 'Message cannot be empty')
+  .max(10000, 'Message too long (max 10KB)')
+  .refine(
+    val => !val.includes('\0'),
+    'Invalid characters detected'
+  );
 
 const Encode = () => {
   const { user, loading: authLoading } = useAuth();
@@ -55,6 +64,17 @@ const Encode = () => {
 
   const handleEncode = async () => {
     if (!file || !message || !user) return;
+
+    // Validate message
+    const messageValidation = messageSchema.safeParse(message);
+    if (!messageValidation.success) {
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: messageValidation.error.errors[0].message
+      });
+      return;
+    }
 
     if (!passphrase) {
       toast({
@@ -291,7 +311,11 @@ const Encode = () => {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
+                  maxLength={10000}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {message.length}/10,000 characters
+                </p>
               </div>
 
               <Button
